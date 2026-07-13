@@ -1,0 +1,81 @@
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.app-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #4f46e5;
+  text-transform: lowercase;
+}
+
+.header-user {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.user-badge {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #4f46e5;
+  background: #eef2ff;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+}
+
+.logout-btn {
+  font-size: 0.875rem;
+  color: #64748b;
+  background: none;
+  border: 1px solid #e2e8f0;
+  padding: 0.35rem 0.75rem;
+  border-radius: 0.5rem;
+  transition: background 0.15s, color 0.15s;
+}
+
+.logout-btn:hover {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.app-main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+}
+
+.welcome {
+  text-align: center;
+  color: #475569;
+}
+
+.welcome p {
+  font-size: 1.125rem;
+}
+
+.welcome-sub {
+  margin-top: 0.5rem;
+  font-size: 0.95rem !important;
+  color: #94a3b8;
+}
+
+.loading-text {
+  color: #94a3b8;
+  font-size: 0.95rem;
+}
