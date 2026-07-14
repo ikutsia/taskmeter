@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import {
   createUserWithEmailAndPassword,
+  deleteUser,
   signInWithEmailAndPassword,
   updateProfile,
 } from 'firebase/auth'
@@ -31,6 +32,8 @@ function getAuthErrorMessage(code) {
       return 'Incorrect email or password.'
     case 'auth/too-many-requests':
       return 'Too many attempts. Please wait a moment and try again.'
+    case 'permission-denied':
+      return 'Database access denied. Check your Firestore security rules.'
     default:
       return 'Something went wrong. Please try again.'
   }
@@ -81,6 +84,9 @@ function LoginPage() {
     setLoading(true)
 
     try {
+      const { user } = await createUserWithEmailAndPassword(auth, email, password)
+      await updateProfile(user, { displayName: selectedMember })
+
       const nameQuery = query(
         collection(db, 'members'),
         where('name', '==', selectedMember),
@@ -88,12 +94,10 @@ function LoginPage() {
       const existing = await getDocs(nameQuery)
 
       if (!existing.empty) {
+        await deleteUser(user)
         setError(`${selectedMember} already has an account. Please sign in.`)
         return
       }
-
-      const { user } = await createUserWithEmailAndPassword(auth, email, password)
-      await updateProfile(user, { displayName: selectedMember })
 
       await addDoc(collection(db, 'members'), {
         uid: user.uid,
@@ -102,6 +106,7 @@ function LoginPage() {
         createdAt: serverTimestamp(),
       })
     } catch (err) {
+      console.error('Sign up error:', err.code, err.message)
       setError(getAuthErrorMessage(err.code))
     } finally {
       setLoading(false)
