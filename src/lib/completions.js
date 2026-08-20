@@ -10,7 +10,7 @@ import {
   where,
 } from 'firebase/firestore'
 import { db } from '../firebase'
-import { isFutureDate } from './dates'
+import { isEditableDate } from './dates'
 
 export async function getCompletionsForUserDate(userId, date) {
   const q = query(
@@ -27,8 +27,8 @@ export async function getCompletionsForUserDate(userId, date) {
 }
 
 export async function saveCompletionsForDate(user, date, selectedTasks) {
-  if (isFutureDate(date)) {
-    throw new Error('FUTURE_DATE')
+  if (!isEditableDate(date)) {
+    throw new Error('INVALID_EDIT_DATE')
   }
 
   const existing = await getCompletionsForUserDate(user.uid, date)

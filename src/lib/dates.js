@@ -11,15 +11,25 @@ export function getTodayString() {
   return toDateString(new Date())
 }
 
-export function isFutureDate(dateString) {
-  if (!dateString) return false
-  return dateString > getTodayString()
+export function getYesterdayString() {
+  const date = new Date()
+  date.setDate(date.getDate() - 1)
+  return toDateString(date)
 }
 
-export function clampToToday(dateString) {
-  if (!dateString || isFutureDate(dateString)) {
-    return getTodayString()
-  }
+export function isEditableDate(dateString) {
+  if (!dateString) return false
+  return dateString >= getYesterdayString() && dateString <= getTodayString()
+}
+
+export function clampToEditableDate(dateString) {
+  if (!dateString) return getTodayString()
+
+  const today = getTodayString()
+  const yesterday = getYesterdayString()
+
+  if (dateString > today) return today
+  if (dateString < yesterday) return yesterday
   return dateString
 }
 

@@ -8,11 +8,64 @@ import {
   getMonthBounds,
   getMonthLabel,
   getTodayString,
+  parseDateString,
   WEEKDAYS,
 } from '../lib/dates'
 import './SharedCalendar.css'
 
 const MEMBER_ORDER = ['Irakli', 'Nino']
+
+function formatExpandedDayLabel(dateString, dayOfWeek) {
+  const date = parseDateString(dateString)
+  const formatted = date.toLocaleDateString(undefined, {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  })
+  return `${formatted} — ${dayOfWeek}`
+}
+
+function DayPreview({ dayCompletions }) {
+  const membersWithTasks = MEMBER_ORDER.filter(
+    (name) => dayCompletions[name]?.length,
+  )
+
+  if (membersWithTasks.length === 0) {
+    return <p className="calendar-empty">No tasks logged</p>
+  }
+
+  return membersWithTasks.map((memberName) => (
+    <div key={memberName} className="calendar-member">
+      <p className="calendar-member-name">{memberName}</p>
+      <ul>
+        {dayCompletions[memberName].map((taskName) => (
+          <li key={`${memberName}-${taskName}`}>{taskName}</li>
+        ))}
+      </ul>
+    </div>
+  ))
+}
+
+function DayExpandedContent({ dayCompletions }) {
+  return MEMBER_ORDER.map((memberName) => {
+    const tasks = dayCompletions[memberName] || []
+
+    return (
+      <div key={memberName} className="calendar-modal-member">
+        <h3>{memberName}</h3>
+        {tasks.length === 0 ? (
+          <p className="calendar-modal-empty">No tasks logged</p>
+        ) : (
+          <ul>
+            {tasks.map((taskName) => (
+              <li key={`${memberName}-${taskName}`}>{taskName}</li>
+            ))}
+          </ul>
+        )}
+      </div>
+    )
+  })
+}
 
 function SharedCalendar() {
   const today = new Date()
@@ -21,6 +74,7 @@ function SharedCalendar() {
   const [completions, setCompletions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [expandedDay, setExpandedDay] = useState(null)
 
   const { start, end } = useMemo(
     () => getMonthBounds(viewYear, viewMonth),
@@ -58,6 +112,24 @@ function SharedCalendar() {
     return unsubscribe
   }, [start, end])
 
+  useEffect(() => {
+    if (!expandedDay) return
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setExpandedDay(null)
+      }
+    }
+
+    document.body.style.overflow = 'hidden'
+    window.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.body.style.overflow = ''
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [expandedDay])
+
   const goToPreviousMonth = () => {
     if (viewMonth === 0) {
       setViewMonth(11)
@@ -77,6 +149,9 @@ function SharedCalendar() {
   }
 
   const todayString = getTodayString()
+  const expandedDayCompletions = expandedDay
+    ? completionsByDate[expandedDay.dateString] || {}
+    : {}
 
   return (
     <section className="shared-calendar">
@@ -104,13 +179,11 @@ function SharedCalendar() {
 
         {calendarDays.map((day) => {
           const dayCompletions = completionsByDate[day.dateString] || {}
-          const membersWithTasks = MEMBER_ORDER.filter(
-            (name) => dayCompletions[name]?.length,
-          )
 
           return (
-            <article
+            <button
               key={day.dateString}
+              type="button"
               className={[
                 'calendar-day',
                 !day.isCurrentMonth && 'other-month',
@@ -119,6 +192,8 @@ function SharedCalendar() {
               ]
                 .filter(Boolean)
                 .join(' ')}
+              onClick={() => setExpandedDay(day)}
+              aria-label={`View details for ${formatExpandedDayLabel(day.dateString, day.dayOfWeek)}`}
             >
               <header className="calendar-day-header">
                 <span className="calendar-day-number">{day.dayOfMonth}</span>
@@ -126,25 +201,47 @@ function SharedCalendar() {
               </header>
 
               <div className="calendar-day-body">
-                {membersWithTasks.length === 0 ? (
-                  <p className="calendar-empty">No tasks logged</p>
-                ) : (
-                  membersWithTasks.map((memberName) => (
-                    <div key={memberName} className="calendar-member">
-                      <p className="calendar-member-name">{memberName}</p>
-                      <ul>
-                        {dayCompletions[memberName].map((taskName) => (
-                          <li key={`${memberName}-${taskName}`}>{taskName}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))
-                )}
+                <DayPreview dayCompletions={dayCompletions} />
               </div>
-            </article>
+            </button>
           )
         })}
       </div>
+
+      {expandedDay && (
+        <div
+          className="calendar-modal-overlay"
+          onClick={() => setExpandedDay(null)}
+          role="presentation"
+        >
+          <div
+            className="calendar-modal"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="calendar-modal-title"
+          >
+            <button
+              type="button"
+              className="calendar-modal-close"
+              onClick={() => setExpandedDay(null)}
+              aria-label="Close day details"
+            >
+              ×
+            </button>
+
+            <header className="calendar-modal-header">
+              <h2 id="calendar-modal-title">
+                {formatExpandedDayLabel(expandedDay.dateString, expandedDay.dayOfWeek)}
+              </h2>
+            </header>
+
+            <div className="calendar-modal-content">
+              <DayExpandedContent dayCompletions={expandedDayCompletions} />
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   )
 }

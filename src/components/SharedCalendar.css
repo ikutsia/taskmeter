@@ -60,6 +60,8 @@
 
 .calendar-day {
   min-height: 140px;
+  width: 100%;
+  text-align: left;
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 0.75rem;
@@ -67,6 +69,19 @@
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+}
+
+.calendar-day:hover {
+  border-color: #c7d2fe;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.12);
+}
+
+.calendar-day:focus-visible {
+  outline: none;
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2);
 }
 
 .calendar-day.other-month {
@@ -131,6 +146,105 @@
   font-size: 0.7rem;
   line-height: 1.3;
   color: #334155;
+}
+
+.calendar-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(15, 23, 42, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.calendar-modal {
+  position: relative;
+  width: min(720px, 100%);
+  max-height: calc(100vh - 2rem);
+  background: #ffffff;
+  border-radius: 1rem;
+  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.calendar-modal-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: none;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 1.5rem;
+  line-height: 1;
+  z-index: 1;
+}
+
+.calendar-modal-header {
+  padding: 1.5rem 3.5rem 1rem 1.5rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.calendar-modal-header h2 {
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.calendar-modal-content {
+  padding: 1.5rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.calendar-modal-member h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #4f46e5;
+  margin-bottom: 0.5rem;
+}
+
+.calendar-modal-member ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.calendar-modal-member li {
+  font-size: 1rem;
+  line-height: 1.4;
+  color: #1e293b;
+  padding: 0.75rem 1rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+}
+
+.calendar-modal-empty {
+  font-size: 0.95rem;
+  color: #94a3b8;
+}
+
+@media (max-width: 640px) {
+  .calendar-modal-overlay {
+    padding: 0;
+  }
+
+  .calendar-modal {
+    width: 100%;
+    max-height: 100vh;
+    height: 100vh;
+    border-radius: 0;
+  }
 }
 
 @media (max-width: 900px) {
