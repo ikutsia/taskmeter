@@ -55,24 +55,8 @@
 .app-main {
   flex: 1;
   display: flex;
-  align-items: center;
   justify-content: center;
   padding: 2rem 1rem;
-}
-
-.welcome {
-  text-align: center;
-  color: #475569;
-}
-
-.welcome p {
-  font-size: 1.125rem;
-}
-
-.welcome-sub {
-  margin-top: 0.5rem;
-  font-size: 0.95rem !important;
-  color: #94a3b8;
 }
 
 .loading-text {

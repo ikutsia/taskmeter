@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { onAuthStateChanged, signOut } from 'firebase/auth'
 import { auth } from './firebase'
 import LoginPage from './components/LoginPage'
+import TaskList from './components/TaskList'
 import './App.css'
 
 function App() {
@@ -40,10 +41,7 @@ function App() {
         {!authReady ? (
           <p className="loading-text">Loading…</p>
         ) : user ? (
-          <div className="welcome">
-            <p>Welcome, <strong>{displayName}</strong>!</p>
-            <p className="welcome-sub">Task tracking coming soon.</p>
-          </div>
+          <TaskList userName={displayName} />
         ) : (
           <LoginPage />
         )}
