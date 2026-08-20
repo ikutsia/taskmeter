@@ -54,7 +54,11 @@ service cloud.firestore {
     }
 
     match /completions/{completionId} {
-      allow read, write: if isSignedIn();
+      allow read: if true;
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isSignedIn()
+        && resource.data.userId == request.auth.uid;
     }
   }
 }

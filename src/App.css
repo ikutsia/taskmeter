@@ -22,7 +22,7 @@
   text-transform: lowercase;
 }
 
-.header-user {
+.header-actions {
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -37,14 +37,28 @@
   border-radius: 999px;
 }
 
+.sign-in-btn,
 .logout-btn {
   font-size: 0.875rem;
-  color: #64748b;
-  background: none;
-  border: 1px solid #e2e8f0;
   padding: 0.35rem 0.75rem;
   border-radius: 0.5rem;
   transition: background 0.15s, color 0.15s;
+}
+
+.sign-in-btn {
+  color: #ffffff;
+  background: #4f46e5;
+  border: none;
+}
+
+.sign-in-btn:hover {
+  background: #4338ca;
+}
+
+.logout-btn {
+  color: #64748b;
+  background: none;
+  border: 1px solid #e2e8f0;
 }
 
 .logout-btn:hover {
@@ -54,12 +68,43 @@
 
 .app-main {
   flex: 1;
+  padding: 1.5rem 1rem 2rem;
+}
+
+.dashboard {
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
   display: flex;
-  justify-content: center;
-  padding: 2rem 1rem;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.auth-panel {
+  position: relative;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  padding: 1rem;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+
+.auth-panel-close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 1.25rem;
+  line-height: 1;
 }
 
 .loading-text {
   color: #94a3b8;
   font-size: 0.95rem;
+  text-align: center;
 }
