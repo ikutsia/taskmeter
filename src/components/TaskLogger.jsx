@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getCompletionsForUserDate, saveCompletionsForDate } from '../lib/completions'
-import { getTodayString } from '../lib/dates'
+import { clampToToday, getTodayString, isFutureDate } from '../lib/dates'
 import { ensureDefaultTasks, subscribeToActiveTasks } from '../lib/tasks'
 import './TaskLogger.css'
 
@@ -81,7 +81,29 @@ function TaskLogger({ user }) {
     setMessage('')
   }
 
+  const handleDateChange = (event) => {
+    const nextDate = event.target.value
+    if (!nextDate) return
+
+    if (isFutureDate(nextDate)) {
+      setError('You can only log tasks for today or past dates.')
+      setSelectedDate(getTodayString())
+      setMessage('')
+      return
+    }
+
+    setError('')
+    setMessage('')
+    setSelectedDate(nextDate)
+  }
+
   const handleSave = async () => {
+    if (isFutureDate(selectedDate)) {
+      setError('You can only log tasks for today or past dates.')
+      setSelectedDate(getTodayString())
+      return
+    }
+
     setSaving(true)
     setError('')
     setMessage('')
@@ -93,7 +115,12 @@ function TaskLogger({ user }) {
       setDropdownOpen(false)
     } catch (err) {
       console.error('Failed to save entry:', err)
-      setError('Could not save your tasks. Please try again.')
+      if (err.message === 'FUTURE_DATE') {
+        setError('You can only log tasks for today or past dates.')
+        setSelectedDate(getTodayString())
+      } else {
+        setError('Could not save your tasks. Please try again.')
+      }
     } finally {
       setSaving(false)
     }
@@ -113,7 +140,14 @@ function TaskLogger({ user }) {
             type="date"
             value={selectedDate}
             max={today}
-            onChange={(e) => setSelectedDate(e.target.value)}
+            onChange={handleDateChange}
+            onBlur={(event) => {
+              const clamped = clampToToday(event.target.value)
+              if (clamped !== event.target.value) {
+                setSelectedDate(clamped)
+                setError('You can only log tasks for today or past dates.')
+              }
+            }}
           />
         </label>
 
@@ -122,7 +156,7 @@ function TaskLogger({ user }) {
             type="button"
             className="task-dropdown-toggle"
             onClick={() => setDropdownOpen((open) => !open)}
-            disabled={loadingTasks || loadingEntry}
+            disabled={loadingTasks || loadingEntry || isFutureDate(selectedDate)}
             aria-expanded={dropdownOpen}
           >
             {dropdownOpen ? 'Hide tasks ▲' : 'Select tasks ▼'}
@@ -153,7 +187,7 @@ function TaskLogger({ user }) {
                     type="button"
                     className="task-save-btn"
                     onClick={handleSave}
-                    disabled={saving}
+                    disabled={saving || isFutureDate(selectedDate)}
                   >
                     {saving ? 'Saving…' : 'Save tasks'}
                   </button>

@@ -11,6 +11,18 @@ export function getTodayString() {
   return toDateString(new Date())
 }
 
+export function isFutureDate(dateString) {
+  if (!dateString) return false
+  return dateString > getTodayString()
+}
+
+export function clampToToday(dateString) {
+  if (!dateString || isFutureDate(dateString)) {
+    return getTodayString()
+  }
+  return dateString
+}
+
 export function parseDateString(dateString) {
   const [y, m, d] = dateString.split('-').map(Number)
   return new Date(y, m - 1, d)

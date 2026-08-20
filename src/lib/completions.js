@@ -10,6 +10,7 @@ import {
   where,
 } from 'firebase/firestore'
 import { db } from '../firebase'
+import { isFutureDate } from './dates'
 
 export async function getCompletionsForUserDate(userId, date) {
   const q = query(
@@ -26,6 +27,10 @@ export async function getCompletionsForUserDate(userId, date) {
 }
 
 export async function saveCompletionsForDate(user, date, selectedTasks) {
+  if (isFutureDate(date)) {
+    throw new Error('FUTURE_DATE')
+  }
+
   const existing = await getCompletionsForUserDate(user.uid, date)
   const existingByTaskId = new Map(existing.map((item) => [item.taskId, item]))
   const selectedIds = new Set(selectedTasks.map((task) => task.id))
