@@ -38,8 +38,8 @@ function DayPreview({ dayCompletions }) {
     <div key={memberName} className="calendar-member">
       <p className="calendar-member-name">{memberName}</p>
       <ul>
-        {dayCompletions[memberName].map((taskName) => (
-          <li key={`${memberName}-${taskName}`}>{taskName}</li>
+        {dayCompletions[memberName].map((task) => (
+          <li key={`${memberName}-${task.code}`}>{task.code}</li>
         ))}
       </ul>
     </div>
@@ -57,8 +57,8 @@ function DayExpandedContent({ dayCompletions }) {
           <p className="calendar-modal-empty">No tasks logged</p>
         ) : (
           <ul>
-            {tasks.map((taskName) => (
-              <li key={`${memberName}-${taskName}`}>{taskName}</li>
+            {tasks.map((task) => (
+              <li key={`${memberName}-${task.code}`}>{task.name}</li>
             ))}
           </ul>
         )}

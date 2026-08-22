@@ -46,6 +46,7 @@ export async function saveCompletionsForDate(user, date, selectedTasks) {
         userId: user.uid,
         userName: user.displayName || user.email,
         taskId: task.id,
+        taskCode: task.code,
         taskName: task.name,
         date,
         completedAt: serverTimestamp(),
@@ -79,6 +80,8 @@ export function groupCompletionsByDate(completions) {
   const grouped = {}
 
   for (const completion of completions) {
+    if (!completion.taskCode) continue
+
     if (!grouped[completion.date]) {
       grouped[completion.date] = {}
     }
@@ -88,12 +91,15 @@ export function groupCompletionsByDate(completions) {
       grouped[completion.date][userName] = []
     }
 
-    grouped[completion.date][userName].push(completion.taskName)
+    grouped[completion.date][userName].push({
+      code: completion.taskCode,
+      name: completion.taskName,
+    })
   }
 
   for (const date of Object.keys(grouped)) {
     for (const userName of Object.keys(grouped[date])) {
-      grouped[date][userName].sort((a, b) => a.localeCompare(b))
+      grouped[date][userName].sort((a, b) => a.code.localeCompare(b.code))
     }
   }
 

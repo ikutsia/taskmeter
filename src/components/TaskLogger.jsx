@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getCompletionsForUserDate, saveCompletionsForDate } from '../lib/completions'
 import { clampToEditableDate, getTodayString, getYesterdayString, isEditableDate } from '../lib/dates'
-import { ensureDefaultTasks, subscribeToActiveTasks } from '../lib/tasks'
+import { ensureDefaultTasks, formatTaskDropdownLabel, subscribeToActiveTasks } from '../lib/tasks'
 import './TaskLogger.css'
 
 function TaskLogger({ user }) {
@@ -180,7 +180,7 @@ function TaskLogger({ user }) {
                             checked={selectedTaskIds.has(task.id)}
                             onChange={() => toggleTask(task.id)}
                           />
-                          <span>{task.name}</span>
+                          <span>{formatTaskDropdownLabel(task)}</span>
                         </label>
                       </li>
                     ))}

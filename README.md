@@ -53,6 +53,11 @@ service cloud.firestore {
       allow read, write: if isSignedIn();
     }
 
+    match /settings/{docId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
     match /completions/{completionId} {
       allow read: if true;
       allow create: if isSignedIn()
