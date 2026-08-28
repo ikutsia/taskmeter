@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getCompletionsForUserDate, saveCompletionsForDate } from '../lib/completions'
 import { clampToEditableDate, getTodayString, getYesterdayString, isEditableDate } from '../lib/dates'
+import { getNoteForUserDate, MAX_NOTE_LENGTH, saveNoteForDate } from '../lib/notes'
 import { ensureDefaultTasks, formatTaskDropdownLabel, subscribeToActiveTasks } from '../lib/tasks'
 import './TaskLogger.css'
 
@@ -8,6 +9,7 @@ function TaskLogger({ user }) {
   const [tasks, setTasks] = useState([])
   const [selectedDate, setSelectedDate] = useState(getTodayString())
   const [selectedTaskIds, setSelectedTaskIds] = useState(new Set())
+  const [noteText, setNoteText] = useState('')
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [loadingTasks, setLoadingTasks] = useState(true)
   const [loadingEntry, setLoadingEntry] = useState(false)
@@ -57,11 +59,15 @@ function TaskLogger({ user }) {
       setMessage('')
 
       try {
-        const existing = await getCompletionsForUserDate(user.uid, selectedDate)
-        setSelectedTaskIds(new Set(existing.map((item) => item.taskId)))
+        const [existingCompletions, existingNote] = await Promise.all([
+          getCompletionsForUserDate(user.uid, selectedDate),
+          getNoteForUserDate(user.uid, selectedDate),
+        ])
+        setSelectedTaskIds(new Set(existingCompletions.map((item) => item.taskId)))
+        setNoteText(existingNote?.text || '')
       } catch (err) {
         console.error('Failed to load entry:', err)
-        setError('Could not load your tasks for this date.')
+        setError('Could not load your entry for this date.')
       } finally {
         setLoadingEntry(false)
       }
@@ -106,22 +112,32 @@ function TaskLogger({ user }) {
       return
     }
 
+    if (noteText.trim().length > MAX_NOTE_LENGTH) {
+      setError(`Notes must be ${MAX_NOTE_LENGTH} characters or fewer.`)
+      return
+    }
+
     setSaving(true)
     setError('')
     setMessage('')
 
     try {
       const selectedTasks = tasks.filter((task) => selectedTaskIds.has(task.id))
-      await saveCompletionsForDate(user, selectedDate, selectedTasks)
-      setMessage(`Saved ${displayName}'s tasks for ${selectedDate}.`)
+      await Promise.all([
+        saveCompletionsForDate(user, selectedDate, selectedTasks),
+        saveNoteForDate(user, selectedDate, noteText),
+      ])
+      setMessage(`Saved ${displayName}'s entry for ${selectedDate}.`)
       setDropdownOpen(false)
     } catch (err) {
       console.error('Failed to save entry:', err)
       if (err.message === 'INVALID_EDIT_DATE') {
         setError(editableDateError)
         setSelectedDate(getTodayString())
+      } else if (err.message === 'NOTE_TOO_LONG') {
+        setError(`Notes must be ${MAX_NOTE_LENGTH} characters or fewer.`)
       } else {
-        setError('Could not save your tasks. Please try again.')
+        setError('Could not save your entry. Please try again.')
       }
     } finally {
       setSaving(false)
@@ -132,7 +148,7 @@ function TaskLogger({ user }) {
     <section className="task-logger">
       <div className="task-logger-header">
         <h2>Log tasks</h2>
-        <p>Select a date (today or yesterday) and choose the tasks {displayName} completed.</p>
+        <p>Select a date (today or yesterday), choose tasks, and add optional notes.</p>
       </div>
 
       <div className="task-logger-controls">
@@ -170,36 +186,52 @@ function TaskLogger({ user }) {
               {loadingTasks || loadingEntry ? (
                 <p className="task-dropdown-status">Loading…</p>
               ) : (
-                <>
-                  <ul className="task-checkbox-list">
-                    {tasks.map((task) => (
-                      <li key={task.id}>
-                        <label className="task-checkbox-item">
-                          <input
-                            type="checkbox"
-                            checked={selectedTaskIds.has(task.id)}
-                            onChange={() => toggleTask(task.id)}
-                          />
-                          <span>{formatTaskDropdownLabel(task)}</span>
-                        </label>
-                      </li>
-                    ))}
-                  </ul>
-
-                  <button
-                    type="button"
-                    className="task-save-btn"
-                    onClick={handleSave}
-                    disabled={saving || !isEditableDate(selectedDate)}
-                  >
-                    {saving ? 'Saving…' : 'Save tasks'}
-                  </button>
-                </>
+                <ul className="task-checkbox-list">
+                  {tasks.map((task) => (
+                    <li key={task.id}>
+                      <label className="task-checkbox-item">
+                        <input
+                          type="checkbox"
+                          checked={selectedTaskIds.has(task.id)}
+                          onChange={() => toggleTask(task.id)}
+                        />
+                        <span>{formatTaskDropdownLabel(task)}</span>
+                      </label>
+                    </li>
+                  ))}
+                </ul>
               )}
             </div>
           )}
         </div>
       </div>
+
+      <label className="task-notes-field">
+        <span>Notes (optional)</span>
+        <textarea
+          value={noteText}
+          onChange={(event) => {
+            setNoteText(event.target.value)
+            setMessage('')
+          }}
+          placeholder="Add notes about your tasks, or describe something you did that is not on the list..."
+          rows={4}
+          maxLength={MAX_NOTE_LENGTH}
+          disabled={loadingEntry || !isEditableDate(selectedDate)}
+        />
+        <span className="task-notes-count">
+          {noteText.length}/{MAX_NOTE_LENGTH}
+        </span>
+      </label>
+
+      <button
+        type="button"
+        className="task-save-btn task-save-btn-main"
+        onClick={handleSave}
+        disabled={saving || loadingEntry || !isEditableDate(selectedDate)}
+      >
+        {saving ? 'Saving…' : 'Save entry'}
+      </button>
 
       {message && <p className="task-logger-message">{message}</p>}
       {error && <p className="task-logger-error" role="alert">{error}</p>}

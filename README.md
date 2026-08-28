@@ -65,6 +65,14 @@ service cloud.firestore {
       allow update, delete: if isSignedIn()
         && resource.data.userId == request.auth.uid;
     }
+
+    match /notes/{noteId} {
+      allow read: if true;
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isSignedIn()
+        && resource.data.userId == request.auth.uid;
+    }
   }
 }
 ```

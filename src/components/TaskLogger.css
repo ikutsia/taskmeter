@@ -109,7 +109,6 @@
 
 .task-save-btn {
   width: 100%;
-  margin-top: 0.875rem;
   padding: 0.75rem 1rem;
   font-size: 0.95rem;
   font-weight: 600;
@@ -117,6 +116,50 @@
   background: #4f46e5;
   border: none;
   border-radius: 0.5rem;
+}
+
+.task-save-btn-main {
+  margin-top: 1rem;
+}
+
+.task-notes-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  margin-top: 1rem;
+}
+
+.task-notes-field span:first-child {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.task-notes-field textarea {
+  padding: 0.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  resize: vertical;
+  min-height: 100px;
+}
+
+.task-notes-field textarea:focus {
+  outline: none;
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+}
+
+.task-notes-field textarea:disabled {
+  background: #f8fafc;
+  cursor: not-allowed;
+}
+
+.task-notes-count {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  text-align: right;
 }
 
 .task-save-btn:disabled {

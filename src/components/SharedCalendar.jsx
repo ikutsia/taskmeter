@@ -11,6 +11,7 @@ import {
   parseDateString,
   WEEKDAYS,
 } from '../lib/dates'
+import { groupNotesByDate, subscribeToNotesInRange } from '../lib/notes'
 import './SharedCalendar.css'
 
 const MEMBER_ORDER = ['Irakli', 'Nino']
@@ -25,42 +26,64 @@ function formatExpandedDayLabel(dateString, dayOfWeek) {
   return `${formatted} — ${dayOfWeek}`
 }
 
-function DayPreview({ dayCompletions }) {
-  const membersWithTasks = MEMBER_ORDER.filter(
-    (name) => dayCompletions[name]?.length,
+function getMembersWithContent(dayCompletions, dayNotes) {
+  return MEMBER_ORDER.filter(
+    (name) => dayCompletions[name]?.length || dayNotes[name],
   )
+}
 
-  if (membersWithTasks.length === 0) {
+function DayPreview({ dayCompletions, dayNotes }) {
+  const membersWithContent = getMembersWithContent(dayCompletions, dayNotes)
+
+  if (membersWithContent.length === 0) {
     return <p className="calendar-empty">No tasks logged</p>
   }
 
-  return membersWithTasks.map((memberName) => (
+  return membersWithContent.map((memberName) => (
     <div key={memberName} className="calendar-member">
       <p className="calendar-member-name">{memberName}</p>
-      <ul>
-        {dayCompletions[memberName].map((task) => (
-          <li key={`${memberName}-${task.code}`}>{task.code}</li>
-        ))}
-      </ul>
+      {dayCompletions[memberName]?.length > 0 && (
+        <ul>
+          {dayCompletions[memberName].map((task) => (
+            <li key={`${memberName}-${task.code}`}>{task.code}</li>
+          ))}
+        </ul>
+      )}
+      {dayNotes[memberName] && (
+        <p className="calendar-note-indicator" title={dayNotes[memberName]}>
+          Note
+        </p>
+      )}
     </div>
   ))
 }
 
-function DayExpandedContent({ dayCompletions }) {
+function DayExpandedContent({ dayCompletions, dayNotes }) {
   return MEMBER_ORDER.map((memberName) => {
     const tasks = dayCompletions[memberName] || []
+    const note = dayNotes[memberName] || ''
 
     return (
       <div key={memberName} className="calendar-modal-member">
         <h3>{memberName}</h3>
-        {tasks.length === 0 ? (
+        {tasks.length === 0 && !note ? (
           <p className="calendar-modal-empty">No tasks logged</p>
         ) : (
-          <ul>
-            {tasks.map((task) => (
-              <li key={`${memberName}-${task.code}`}>{task.name}</li>
-            ))}
-          </ul>
+          <>
+            {tasks.length > 0 && (
+              <ul>
+                {tasks.map((task) => (
+                  <li key={`${memberName}-${task.code}`}>{task.name}</li>
+                ))}
+              </ul>
+            )}
+            {note && (
+              <div className="calendar-modal-note">
+                <p className="calendar-modal-note-label">Note</p>
+                <p className="calendar-modal-note-text">{note}</p>
+              </div>
+            )}
+          </>
         )}
       </div>
     )
@@ -72,6 +95,7 @@ function SharedCalendar() {
   const [viewYear, setViewYear] = useState(today.getFullYear())
   const [viewMonth, setViewMonth] = useState(today.getMonth())
   const [completions, setCompletions] = useState([])
+  const [notes, setNotes] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [expandedDay, setExpandedDay] = useState(null)
@@ -91,25 +115,63 @@ function SharedCalendar() {
     [completions],
   )
 
+  const notesByDate = useMemo(
+    () => groupNotesByDate(notes),
+    [notes],
+  )
+
   useEffect(() => {
     setLoading(true)
     setError('')
 
-    const unsubscribe = subscribeToCompletionsInRange(
+    let completionsReady = false
+    let notesReady = false
+    let completionsError = null
+    let notesError = null
+
+    const markReady = () => {
+      if (completionsReady && notesReady) {
+        setLoading(false)
+        setError(completionsError || notesError || '')
+      }
+    }
+
+    const unsubscribeCompletions = subscribeToCompletionsInRange(
       start,
       end,
       (nextCompletions) => {
         setCompletions(nextCompletions)
-        setLoading(false)
+        completionsReady = true
+        markReady()
       },
       (err) => {
-        console.error('Failed to load calendar:', err)
-        setError('Could not load the calendar.')
-        setLoading(false)
+        console.error('Failed to load calendar completions:', err)
+        completionsError = 'Could not load the calendar.'
+        completionsReady = true
+        markReady()
       },
     )
 
-    return unsubscribe
+    const unsubscribeNotes = subscribeToNotesInRange(
+      start,
+      end,
+      (nextNotes) => {
+        setNotes(nextNotes)
+        notesReady = true
+        markReady()
+      },
+      (err) => {
+        console.error('Failed to load calendar notes:', err)
+        notesError = 'Could not load the calendar.'
+        notesReady = true
+        markReady()
+      },
+    )
+
+    return () => {
+      unsubscribeCompletions()
+      unsubscribeNotes()
+    }
   }, [start, end])
 
   useEffect(() => {
@@ -152,6 +214,9 @@ function SharedCalendar() {
   const expandedDayCompletions = expandedDay
     ? completionsByDate[expandedDay.dateString] || {}
     : {}
+  const expandedDayNotes = expandedDay
+    ? notesByDate[expandedDay.dateString] || {}
+    : {}
 
   return (
     <section className="shared-calendar">
@@ -179,6 +244,7 @@ function SharedCalendar() {
 
         {calendarDays.map((day) => {
           const dayCompletions = completionsByDate[day.dateString] || {}
+          const dayNotes = notesByDate[day.dateString] || {}
 
           return (
             <button
@@ -201,7 +267,7 @@ function SharedCalendar() {
               </header>
 
               <div className="calendar-day-body">
-                <DayPreview dayCompletions={dayCompletions} />
+                <DayPreview dayCompletions={dayCompletions} dayNotes={dayNotes} />
               </div>
             </button>
           )
@@ -237,7 +303,10 @@ function SharedCalendar() {
             </header>
 
             <div className="calendar-modal-content">
-              <DayExpandedContent dayCompletions={expandedDayCompletions} />
+              <DayExpandedContent
+                dayCompletions={expandedDayCompletions}
+                dayNotes={expandedDayNotes}
+              />
             </div>
           </div>
         </div>
