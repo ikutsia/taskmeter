@@ -12,6 +12,34 @@ import {
 import { db } from '../firebase'
 import { isEditableDate } from './dates'
 
+export function getOccurrenceFromTaskCode(taskCode, baseCode) {
+  if (taskCode === baseCode) return 1
+  if (taskCode.startsWith(baseCode)) {
+    const suffix = taskCode.slice(baseCode.length)
+    if (/^\d+$/.test(suffix)) {
+      return Number.parseInt(suffix, 10)
+    }
+  }
+  return 1
+}
+
+export function getTaskCodeForOccurrence(baseCode, occurrence) {
+  if (occurrence <= 1) return baseCode
+  return `${baseCode}${occurrence}`
+}
+
+export function getNextTaskCode(existingForTask, baseCode) {
+  if (existingForTask.length === 0) {
+    return getTaskCodeForOccurrence(baseCode, 1)
+  }
+
+  const maxOccurrence = Math.max(
+    ...existingForTask.map((item) => getOccurrenceFromTaskCode(item.taskCode, baseCode)),
+  )
+
+  return getTaskCodeForOccurrence(baseCode, maxOccurrence + 1)
+}
+
 export async function getCompletionsForUserDate(userId, date) {
   const q = query(
     collection(db, 'completions'),
@@ -31,29 +59,32 @@ export async function saveCompletionsForDate(user, date, selectedTasks) {
     throw new Error('INVALID_EDIT_DATE')
   }
 
+  if (selectedTasks.length === 0) {
+    return
+  }
+
   const existing = await getCompletionsForUserDate(user.uid, date)
-  const existingByTaskId = new Map(existing.map((item) => [item.taskId, item]))
-  const selectedIds = new Set(selectedTasks.map((task) => task.id))
 
-  const deletions = existing
-    .filter((item) => !selectedIds.has(item.taskId))
-    .map((item) => deleteDoc(doc(db, 'completions', item.id)))
+  await Promise.all(
+    selectedTasks.map(async (task) => {
+      const existingForTask = existing.filter((item) => item.taskId === task.id)
+      const taskCode = getNextTaskCode(existingForTask, task.code)
 
-  const additions = selectedTasks
-    .filter((task) => !existingByTaskId.has(task.id))
-    .map((task) =>
-      addDoc(collection(db, 'completions'), {
+      await Promise.all(
+        existingForTask.map((item) => deleteDoc(doc(db, 'completions', item.id))),
+      )
+
+      await addDoc(collection(db, 'completions'), {
         userId: user.uid,
         userName: user.displayName || user.email,
         taskId: task.id,
-        taskCode: task.code,
+        taskCode,
         taskName: task.name,
         date,
         completedAt: serverTimestamp(),
-      }),
-    )
-
-  await Promise.all([...deletions, ...additions])
+      })
+    }),
+  )
 }
 
 export function subscribeToCompletionsInRange(startDate, endDate, onCompletions, onError) {

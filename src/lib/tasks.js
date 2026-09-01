@@ -16,8 +16,14 @@ import { DEFAULT_TASKS, TASK_LIST_VERSION } from '../constants/defaultTasks'
 
 const EXPECTED_CODES = new Set(DEFAULT_TASKS.map((task) => task.code))
 
-export function formatTaskDropdownLabel(task) {
+export function formatTaskLabel(task) {
+  if (!task?.code) return task?.name || ''
+  if (!task?.name) return task.code
   return `${task.code} – ${task.name}`
+}
+
+export function formatTaskDropdownLabel(task) {
+  return formatTaskLabel(task)
 }
 
 function sortTasks(tasks) {

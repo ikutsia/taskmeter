@@ -12,6 +12,7 @@ import {
   WEEKDAYS,
 } from '../lib/dates'
 import { groupNotesByDate, subscribeToNotesInRange } from '../lib/notes'
+import { formatTaskLabel } from '../lib/tasks'
 import './SharedCalendar.css'
 
 const MEMBER_ORDER = ['Irakli', 'Nino']
@@ -43,11 +44,9 @@ function DayPreview({ dayCompletions, dayNotes }) {
     <div key={memberName} className="calendar-member">
       <p className="calendar-member-name">{memberName}</p>
       {dayCompletions[memberName]?.length > 0 && (
-        <ul>
-          {dayCompletions[memberName].map((task) => (
-            <li key={`${memberName}-${task.code}`}>{task.code}</li>
-          ))}
-        </ul>
+        <p className="calendar-member-codes">
+          {dayCompletions[memberName].map((task) => task.code).join(', ')}
+        </p>
       )}
       {dayNotes[memberName] && (
         <p className="calendar-note-indicator" title={dayNotes[memberName]}>
@@ -73,7 +72,7 @@ function DayExpandedContent({ dayCompletions, dayNotes }) {
             {tasks.length > 0 && (
               <ul>
                 {tasks.map((task) => (
-                  <li key={`${memberName}-${task.code}`}>{task.name}</li>
+                  <li key={`${memberName}-${task.code}`}>{formatTaskLabel(task)}</li>
                 ))}
               </ul>
             )}

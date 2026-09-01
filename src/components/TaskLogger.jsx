@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { getCompletionsForUserDate, saveCompletionsForDate } from '../lib/completions'
+import { saveCompletionsForDate } from '../lib/completions'
 import { clampToEditableDate, getTodayString, getYesterdayString, isEditableDate } from '../lib/dates'
 import { getNoteForUserDate, MAX_NOTE_LENGTH, saveNoteForDate } from '../lib/notes'
-import { ensureDefaultTasks, formatTaskDropdownLabel, subscribeToActiveTasks } from '../lib/tasks'
+import { ensureDefaultTasks, formatTaskLabel, subscribeToActiveTasks } from '../lib/tasks'
 import './TaskLogger.css'
 
 function TaskLogger({ user }) {
@@ -10,7 +10,7 @@ function TaskLogger({ user }) {
   const [selectedDate, setSelectedDate] = useState(getTodayString())
   const [selectedTaskIds, setSelectedTaskIds] = useState(new Set())
   const [noteText, setNoteText] = useState('')
-  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [taskPickerOpen, setTaskPickerOpen] = useState(false)
   const [loadingTasks, setLoadingTasks] = useState(true)
   const [loadingEntry, setLoadingEntry] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -53,17 +53,13 @@ function TaskLogger({ user }) {
   useEffect(() => {
     if (!user) return
 
-    async function loadExistingEntry() {
+    async function loadExistingNote() {
       setLoadingEntry(true)
       setError('')
       setMessage('')
 
       try {
-        const [existingCompletions, existingNote] = await Promise.all([
-          getCompletionsForUserDate(user.uid, selectedDate),
-          getNoteForUserDate(user.uid, selectedDate),
-        ])
-        setSelectedTaskIds(new Set(existingCompletions.map((item) => item.taskId)))
+        const existingNote = await getNoteForUserDate(user.uid, selectedDate)
         setNoteText(existingNote?.text || '')
       } catch (err) {
         console.error('Failed to load entry:', err)
@@ -73,8 +69,27 @@ function TaskLogger({ user }) {
       }
     }
 
-    loadExistingEntry()
+    loadExistingNote()
+    setSelectedTaskIds(new Set())
   }, [user, selectedDate])
+
+  useEffect(() => {
+    if (!taskPickerOpen) return
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        closeTaskPicker()
+      }
+    }
+
+    document.body.style.overflow = 'hidden'
+    window.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.body.style.overflow = ''
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [taskPickerOpen])
 
   const toggleTask = (taskId) => {
     setSelectedTaskIds((current) => {
@@ -105,7 +120,12 @@ function TaskLogger({ user }) {
     setSelectedDate(nextDate)
   }
 
-  const handleSave = async () => {
+  const closeTaskPicker = () => {
+    setTaskPickerOpen(false)
+    setSelectedTaskIds(new Set())
+  }
+
+  const handleSave = async ({ closeTaskPickerOnSuccess = false } = {}) => {
     if (!isEditableDate(selectedDate)) {
       setError(editableDateError)
       setSelectedDate(clampToEditableDate(selectedDate))
@@ -128,7 +148,10 @@ function TaskLogger({ user }) {
         saveNoteForDate(user, selectedDate, noteText),
       ])
       setMessage(`Saved ${displayName}'s entry for ${selectedDate}.`)
-      setDropdownOpen(false)
+      setSelectedTaskIds(new Set())
+      if (closeTaskPickerOnSuccess) {
+        closeTaskPicker()
+      }
     } catch (err) {
       console.error('Failed to save entry:', err)
       if (err.message === 'INVALID_EDIT_DATE') {
@@ -143,6 +166,9 @@ function TaskLogger({ user }) {
       setSaving(false)
     }
   }
+
+  const selectedCount = selectedTaskIds.size
+  const entryDisabled = loadingEntry || !isEditableDate(selectedDate)
 
   return (
     <section className="task-logger">
@@ -170,40 +196,20 @@ function TaskLogger({ user }) {
           />
         </label>
 
-        <div className="task-dropdown">
-          <button
-            type="button"
-            className="task-dropdown-toggle"
-            onClick={() => setDropdownOpen((open) => !open)}
-            disabled={loadingTasks || loadingEntry || !isEditableDate(selectedDate)}
-            aria-expanded={dropdownOpen}
-          >
-            {dropdownOpen ? 'Hide tasks ▲' : 'Select tasks ▼'}
-          </button>
-
-          {dropdownOpen && (
-            <div className="task-dropdown-panel">
-              {loadingTasks || loadingEntry ? (
-                <p className="task-dropdown-status">Loading…</p>
-              ) : (
-                <ul className="task-checkbox-list">
-                  {tasks.map((task) => (
-                    <li key={task.id}>
-                      <label className="task-checkbox-item">
-                        <input
-                          type="checkbox"
-                          checked={selectedTaskIds.has(task.id)}
-                          onChange={() => toggleTask(task.id)}
-                        />
-                        <span>{formatTaskDropdownLabel(task)}</span>
-                      </label>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+        <button
+          type="button"
+          className="task-picker-open-btn"
+          onClick={() => {
+            setSelectedTaskIds(new Set())
+            setTaskPickerOpen(true)
+          }}
+          disabled={loadingTasks || entryDisabled}
+        >
+          Select tasks ▼
+          {selectedCount > 0 && (
+            <span className="task-picker-count">{selectedCount} selected</span>
           )}
-        </div>
+        </button>
       </div>
 
       <label className="task-notes-field">
@@ -217,7 +223,7 @@ function TaskLogger({ user }) {
           placeholder="Add notes about your tasks, or describe something you did that is not on the list..."
           rows={4}
           maxLength={MAX_NOTE_LENGTH}
-          disabled={loadingEntry || !isEditableDate(selectedDate)}
+          disabled={entryDisabled}
         />
         <span className="task-notes-count">
           {noteText.length}/{MAX_NOTE_LENGTH}
@@ -227,14 +233,74 @@ function TaskLogger({ user }) {
       <button
         type="button"
         className="task-save-btn task-save-btn-main"
-        onClick={handleSave}
-        disabled={saving || loadingEntry || !isEditableDate(selectedDate)}
+        onClick={() => handleSave()}
+        disabled={saving || entryDisabled}
       >
         {saving ? 'Saving…' : 'Save entry'}
       </button>
 
       {message && <p className="task-logger-message">{message}</p>}
       {error && <p className="task-logger-error" role="alert">{error}</p>}
+
+      {taskPickerOpen && (
+        <div
+          className="task-picker-overlay"
+          onClick={closeTaskPicker}
+          role="presentation"
+        >
+          <div
+            className="task-picker-modal"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="task-picker-title"
+          >
+            <header className="task-picker-header">
+              <h3 id="task-picker-title">Select tasks</h3>
+              <button
+                type="button"
+                className="task-picker-close"
+                onClick={closeTaskPicker}
+                aria-label="Close task selection"
+              >
+                ×
+              </button>
+            </header>
+
+            <div className="task-picker-body">
+              {loadingTasks || loadingEntry ? (
+                <p className="task-picker-status">Loading…</p>
+              ) : (
+                <ul className="task-checkbox-list">
+                  {tasks.map((task) => (
+                    <li key={task.id}>
+                      <label className="task-checkbox-item">
+                        <input
+                          type="checkbox"
+                          checked={selectedTaskIds.has(task.id)}
+                          onChange={() => toggleTask(task.id)}
+                        />
+                        <span>{formatTaskLabel(task)}</span>
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <footer className="task-picker-footer">
+              <button
+                type="button"
+                className="task-save-btn"
+                onClick={() => handleSave({ closeTaskPickerOnSuccess: true })}
+                disabled={saving || entryDisabled}
+              >
+                {saving ? 'Saving…' : 'Save entry'}
+              </button>
+            </footer>
+          </div>
+        </div>
+      )}
     </section>
   )
 }
