@@ -7,10 +7,23 @@ import {
   onSnapshot,
   query,
   serverTimestamp,
+  updateDoc,
   where,
 } from 'firebase/firestore'
 import { db } from '../firebase'
 import { isEditableDate } from './dates'
+
+export function splitTaskCode(taskCode) {
+  const match = String(taskCode || '').match(/^(.*?)(\d+)$/)
+  if (!match) {
+    return { baseCode: taskCode, occurrence: 1 }
+  }
+
+  return {
+    baseCode: match[1],
+    occurrence: Number.parseInt(match[2], 10),
+  }
+}
 
 export function getOccurrenceFromTaskCode(taskCode, baseCode) {
   if (taskCode === baseCode) return 1
@@ -87,6 +100,27 @@ export async function saveCompletionsForDate(user, date, selectedTasks) {
   )
 }
 
+export async function reduceOrDeleteCompletion(user, completion) {
+  if (!user || completion.userId !== user.uid) {
+    throw new Error('NOT_OWNER')
+  }
+
+  if (!isEditableDate(completion.date)) {
+    throw new Error('INVALID_EDIT_DATE')
+  }
+
+  const { baseCode, occurrence } = splitTaskCode(completion.taskCode || completion.code)
+
+  if (occurrence <= 1) {
+    await deleteDoc(doc(db, 'completions', completion.id))
+    return
+  }
+
+  await updateDoc(doc(db, 'completions', completion.id), {
+    taskCode: getTaskCodeForOccurrence(baseCode, occurrence - 1),
+  })
+}
+
 export function subscribeToCompletionsInRange(startDate, endDate, onCompletions, onError) {
   const q = query(
     collection(db, 'completions'),
@@ -123,6 +157,10 @@ export function groupCompletionsByDate(completions) {
     }
 
     grouped[completion.date][userName].push({
+      id: completion.id,
+      userId: completion.userId,
+      date: completion.date,
+      taskId: completion.taskId,
       code: completion.taskCode,
       name: completion.taskName,
     })

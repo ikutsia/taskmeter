@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
+  getTaskCodeForOccurrence,
   groupCompletionsByDate,
+  reduceOrDeleteCompletion,
+  splitTaskCode,
   subscribeToCompletionsInRange,
 } from '../lib/completions'
 import {
@@ -8,6 +11,7 @@ import {
   getMonthBounds,
   getMonthLabel,
   getTodayString,
+  isEditableDate,
   parseDateString,
   WEEKDAYS,
 } from '../lib/dates'
@@ -57,10 +61,20 @@ function DayPreview({ dayCompletions, dayNotes }) {
   ))
 }
 
-function DayExpandedContent({ dayCompletions, dayNotes }) {
+function DayExpandedContent({
+  dayCompletions,
+  dayNotes,
+  currentUser,
+  dateString,
+  onRequestDelete,
+}) {
+  const currentName = currentUser?.displayName
+  const canEditDate = Boolean(currentUser) && isEditableDate(dateString)
+
   return MEMBER_ORDER.map((memberName) => {
     const tasks = dayCompletions[memberName] || []
     const note = dayNotes[memberName] || ''
+    const isOwnSection = currentName === memberName
 
     return (
       <div key={memberName} className="calendar-modal-member">
@@ -72,7 +86,19 @@ function DayExpandedContent({ dayCompletions, dayNotes }) {
             {tasks.length > 0 && (
               <ul>
                 {tasks.map((task) => (
-                  <li key={`${memberName}-${task.code}`}>{formatTaskLabel(task)}</li>
+                  <li key={task.id || `${memberName}-${task.code}`} className="calendar-modal-task">
+                    <span>{formatTaskLabel(task)}</span>
+                    {isOwnSection && canEditDate && (
+                      <button
+                        type="button"
+                        className="completion-delete-btn"
+                        onClick={() => onRequestDelete(task)}
+                        aria-label={`Delete ${formatTaskLabel(task)}`}
+                      >
+                        ×
+                      </button>
+                    )}
+                  </li>
                 ))}
               </ul>
             )}
@@ -89,7 +115,7 @@ function DayExpandedContent({ dayCompletions, dayNotes }) {
   })
 }
 
-function SharedCalendar() {
+function SharedCalendar({ user }) {
   const today = new Date()
   const [viewYear, setViewYear] = useState(today.getFullYear())
   const [viewMonth, setViewMonth] = useState(today.getMonth())
@@ -98,6 +124,9 @@ function SharedCalendar() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [expandedDay, setExpandedDay] = useState(null)
+  const [pendingDelete, setPendingDelete] = useState(null)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   const { start, end } = useMemo(
     () => getMonthBounds(viewYear, viewMonth),
@@ -177,9 +206,13 @@ function SharedCalendar() {
     if (!expandedDay) return
 
     const handleKeyDown = (event) => {
-      if (event.key === 'Escape') {
-        setExpandedDay(null)
+      if (event.key !== 'Escape') return
+      if (pendingDelete) {
+        setPendingDelete(null)
+        setDeleteError('')
+        return
       }
+      setExpandedDay(null)
     }
 
     document.body.style.overflow = 'hidden'
@@ -189,7 +222,7 @@ function SharedCalendar() {
       document.body.style.overflow = ''
       window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [expandedDay])
+  }, [expandedDay, pendingDelete])
 
   const goToPreviousMonth = () => {
     if (viewMonth === 0) {
@@ -216,6 +249,36 @@ function SharedCalendar() {
   const expandedDayNotes = expandedDay
     ? notesByDate[expandedDay.dateString] || {}
     : {}
+
+  const closeExpandedDay = () => {
+    setExpandedDay(null)
+    setPendingDelete(null)
+    setDeleteError('')
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!pendingDelete || !user) return
+
+    setDeleting(true)
+    setDeleteError('')
+
+    try {
+      await reduceOrDeleteCompletion(user, pendingDelete)
+      setPendingDelete(null)
+    } catch (err) {
+      console.error('Failed to delete completion:', err)
+      setDeleteError('Could not delete this task. Please try again.')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const pendingDeleteLabel = pendingDelete ? formatTaskLabel(pendingDelete) : ''
+  const pendingSplit = pendingDelete ? splitTaskCode(pendingDelete.code) : null
+  const pendingNextCode =
+    pendingSplit && pendingSplit.occurrence > 1
+      ? getTaskCodeForOccurrence(pendingSplit.baseCode, pendingSplit.occurrence - 1)
+      : ''
 
   return (
     <section className="shared-calendar">
@@ -276,7 +339,7 @@ function SharedCalendar() {
       {expandedDay && (
         <div
           className="calendar-modal-overlay"
-          onClick={() => setExpandedDay(null)}
+          onClick={closeExpandedDay}
           role="presentation"
         >
           <div
@@ -289,7 +352,7 @@ function SharedCalendar() {
             <button
               type="button"
               className="calendar-modal-close"
-              onClick={() => setExpandedDay(null)}
+              onClick={closeExpandedDay}
               aria-label="Close day details"
             >
               ×
@@ -305,7 +368,62 @@ function SharedCalendar() {
               <DayExpandedContent
                 dayCompletions={expandedDayCompletions}
                 dayNotes={expandedDayNotes}
+                currentUser={user}
+                dateString={expandedDay.dateString}
+                onRequestDelete={(task) => {
+                  setDeleteError('')
+                  setPendingDelete(task)
+                }}
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pendingDelete && (
+        <div
+          className="confirm-overlay"
+          onClick={() => {
+            if (deleting) return
+            setPendingDelete(null)
+            setDeleteError('')
+          }}
+          role="presentation"
+        >
+          <div
+            className="confirm-modal"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="confirm-delete-title"
+          >
+            <h3 id="confirm-delete-title">Delete this task?</h3>
+            <p>
+              {pendingNextCode
+                ? `${pendingDeleteLabel} will become ${pendingNextCode}.`
+                : `${pendingDeleteLabel} will be permanently deleted.`}
+            </p>
+            {deleteError && <p className="confirm-error" role="alert">{deleteError}</p>}
+            <div className="confirm-actions">
+              <button
+                type="button"
+                className="confirm-cancel-btn"
+                onClick={() => {
+                  setPendingDelete(null)
+                  setDeleteError('')
+                }}
+                disabled={deleting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="confirm-delete-btn"
+                onClick={handleConfirmDelete}
+                disabled={deleting}
+              >
+                {deleting ? 'Deleting…' : 'Delete'}
+              </button>
             </div>
           </div>
         </div>

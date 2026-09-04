@@ -68,7 +68,7 @@ function App() {
             )}
 
             {user && <TaskLogger user={user} />}
-            <SharedCalendar />
+            <SharedCalendar user={user} />
           </div>
         )}
       </main>
