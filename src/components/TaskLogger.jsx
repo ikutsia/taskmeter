@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { saveCompletionsForDate } from '../lib/completions'
-import { clampToEditableDate, getTodayString, getYesterdayString, isEditableDate } from '../lib/dates'
+import { clampToEditableDate, getFirstDayOfCurrentMonthString, getTodayString, isEditableDate } from '../lib/dates'
 import { getNoteForUserDate, MAX_NOTE_LENGTH, saveNoteForDate } from '../lib/notes'
 import { ensureDefaultTasks, formatTaskLabel, subscribeToActiveTasks } from '../lib/tasks'
 import './TaskLogger.css'
@@ -18,9 +18,9 @@ function TaskLogger({ user }) {
   const [error, setError] = useState('')
 
   const today = getTodayString()
-  const yesterday = getYesterdayString()
+  const monthStart = getFirstDayOfCurrentMonthString()
   const displayName = user.displayName || user.email
-  const editableDateError = 'You can only log tasks for today or yesterday.'
+  const editableDateError = 'You can only log tasks for dates from the 1st of this month through today.'
 
   useEffect(() => {
     let unsubscribe = () => {}
@@ -174,7 +174,7 @@ function TaskLogger({ user }) {
     <section className="task-logger">
       <div className="task-logger-header">
         <h2>Log tasks</h2>
-        <p>Select a date (today or yesterday), choose tasks, and add optional notes.</p>
+        <p>Select a date in this month (through today), choose tasks, and add optional notes.</p>
       </div>
 
       <div className="task-logger-controls">
@@ -183,7 +183,7 @@ function TaskLogger({ user }) {
           <input
             type="date"
             value={selectedDate}
-            min={yesterday}
+            min={monthStart}
             max={today}
             onChange={handleDateChange}
             onBlur={(event) => {
