@@ -66,6 +66,39 @@ export async function saveNoteForDate(user, date, text) {
   })
 }
 
+export async function deleteNoteForUser(user, note) {
+  if (!user || note.userId !== user.uid) {
+    throw new Error('NOT_OWNER')
+  }
+
+  if (!isEditableDate(note.date)) {
+    throw new Error('INVALID_EDIT_DATE')
+  }
+
+  await deleteDoc(doc(db, 'notes', note.id))
+}
+
+export function subscribeToNoteForUserDate(userId, date, onNote, onError) {
+  const q = query(
+    collection(db, 'notes'),
+    where('userId', '==', userId),
+    where('date', '==', date),
+  )
+
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      if (snapshot.empty) {
+        onNote(null)
+        return
+      }
+      const item = snapshot.docs[0]
+      onNote({ id: item.id, ...item.data() })
+    },
+    onError,
+  )
+}
+
 export function subscribeToNotesInRange(startDate, endDate, onNotes, onError) {
   const q = query(
     collection(db, 'notes'),
@@ -96,7 +129,12 @@ export function groupNotesByDate(notes) {
       grouped[note.date] = {}
     }
 
-    grouped[note.date][note.userName || 'Unknown'] = note.text.trim()
+    grouped[note.date][note.userName || 'Unknown'] = {
+      id: note.id,
+      userId: note.userId,
+      date: note.date,
+      text: note.text.trim(),
+    }
   }
 
   return grouped

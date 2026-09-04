@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { saveCompletionsForDate } from '../lib/completions'
 import { clampToEditableDate, getFirstDayOfCurrentMonthString, getTodayString, isEditableDate } from '../lib/dates'
-import { getNoteForUserDate, MAX_NOTE_LENGTH, saveNoteForDate } from '../lib/notes'
+import { MAX_NOTE_LENGTH, saveNoteForDate, subscribeToNoteForUserDate } from '../lib/notes'
 import { ensureDefaultTasks, formatTaskLabel, subscribeToActiveTasks } from '../lib/tasks'
 import './TaskLogger.css'
 
@@ -53,24 +53,26 @@ function TaskLogger({ user }) {
   useEffect(() => {
     if (!user) return
 
-    async function loadExistingNote() {
-      setLoadingEntry(true)
-      setError('')
-      setMessage('')
+    setLoadingEntry(true)
+    setError('')
+    setMessage('')
+    setSelectedTaskIds(new Set())
 
-      try {
-        const existingNote = await getNoteForUserDate(user.uid, selectedDate)
+    const unsubscribe = subscribeToNoteForUserDate(
+      user.uid,
+      selectedDate,
+      (existingNote) => {
         setNoteText(existingNote?.text || '')
-      } catch (err) {
+        setLoadingEntry(false)
+      },
+      (err) => {
         console.error('Failed to load entry:', err)
         setError('Could not load your entry for this date.')
-      } finally {
         setLoadingEntry(false)
-      }
-    }
+      },
+    )
 
-    loadExistingNote()
-    setSelectedTaskIds(new Set())
+    return unsubscribe
   }, [user, selectedDate])
 
   useEffect(() => {

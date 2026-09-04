@@ -15,7 +15,7 @@ import {
   parseDateString,
   WEEKDAYS,
 } from '../lib/dates'
-import { groupNotesByDate, subscribeToNotesInRange } from '../lib/notes'
+import { deleteNoteForUser, groupNotesByDate, subscribeToNotesInRange } from '../lib/notes'
 import { formatTaskLabel } from '../lib/tasks'
 import './SharedCalendar.css'
 
@@ -53,7 +53,7 @@ function DayPreview({ dayCompletions, dayNotes }) {
         </p>
       )}
       {dayNotes[memberName] && (
-        <p className="calendar-note-indicator" title={dayNotes[memberName]}>
+        <p className="calendar-note-indicator" title={dayNotes[memberName].text}>
           Note
         </p>
       )}
@@ -73,7 +73,7 @@ function DayExpandedContent({
 
   return MEMBER_ORDER.map((memberName) => {
     const tasks = dayCompletions[memberName] || []
-    const note = dayNotes[memberName] || ''
+    const note = dayNotes[memberName]
     const isOwnSection = currentName === memberName
 
     return (
@@ -92,7 +92,7 @@ function DayExpandedContent({
                       <button
                         type="button"
                         className="completion-delete-btn"
-                        onClick={() => onRequestDelete(task)}
+                        onClick={() => onRequestDelete({ type: 'completion', ...task })}
                         aria-label={`Delete ${formatTaskLabel(task)}`}
                       >
                         ×
@@ -104,8 +104,20 @@ function DayExpandedContent({
             )}
             {note && (
               <div className="calendar-modal-note">
-                <p className="calendar-modal-note-label">Note</p>
-                <p className="calendar-modal-note-text">{note}</p>
+                <div className="calendar-modal-note-header">
+                  <p className="calendar-modal-note-label">Note</p>
+                  {isOwnSection && canEditDate && (
+                    <button
+                      type="button"
+                      className="completion-delete-btn"
+                      onClick={() => onRequestDelete({ type: 'note', ...note })}
+                      aria-label="Delete note"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+                <p className="calendar-modal-note-text">{note.text}</p>
               </div>
             )}
           </>
@@ -263,18 +275,31 @@ function SharedCalendar({ user }) {
     setDeleteError('')
 
     try {
-      await reduceOrDeleteCompletion(user, pendingDelete)
+      if (pendingDelete.type === 'note') {
+        await deleteNoteForUser(user, pendingDelete)
+      } else {
+        await reduceOrDeleteCompletion(user, pendingDelete)
+      }
       setPendingDelete(null)
     } catch (err) {
-      console.error('Failed to delete completion:', err)
-      setDeleteError('Could not delete this task. Please try again.')
+      console.error('Failed to delete:', err)
+      setDeleteError(
+        pendingDelete.type === 'note'
+          ? 'Could not delete this note. Please try again.'
+          : 'Could not delete this task. Please try again.',
+      )
     } finally {
       setDeleting(false)
     }
   }
 
-  const pendingDeleteLabel = pendingDelete ? formatTaskLabel(pendingDelete) : ''
-  const pendingSplit = pendingDelete ? splitTaskCode(pendingDelete.code) : null
+  const isNoteDelete = pendingDelete?.type === 'note'
+  const pendingDeleteLabel = pendingDelete && !isNoteDelete
+    ? formatTaskLabel(pendingDelete)
+    : ''
+  const pendingSplit = pendingDelete && !isNoteDelete
+    ? splitTaskCode(pendingDelete.code)
+    : null
   const pendingNextCode =
     pendingSplit && pendingSplit.occurrence > 1
       ? getTaskCodeForOccurrence(pendingSplit.baseCode, pendingSplit.occurrence - 1)
@@ -397,11 +422,15 @@ function SharedCalendar({ user }) {
             aria-modal="true"
             aria-labelledby="confirm-delete-title"
           >
-            <h3 id="confirm-delete-title">Delete this task?</h3>
+            <h3 id="confirm-delete-title">
+              {isNoteDelete ? 'Delete this note?' : 'Delete this task?'}
+            </h3>
             <p>
-              {pendingNextCode
-                ? `${pendingDeleteLabel} will become ${pendingNextCode}.`
-                : `${pendingDeleteLabel} will be permanently deleted.`}
+              {isNoteDelete
+                ? 'This note will be permanently deleted.'
+                : pendingNextCode
+                  ? `${pendingDeleteLabel} will become ${pendingNextCode}.`
+                  : `${pendingDeleteLabel} will be permanently deleted.`}
             </p>
             {deleteError && <p className="confirm-error" role="alert">{deleteError}</p>}
             <div className="confirm-actions">
