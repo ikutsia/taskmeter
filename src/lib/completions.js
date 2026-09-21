@@ -67,7 +67,7 @@ export async function getCompletionsForUserDate(userId, date) {
   }))
 }
 
-export async function saveCompletionsForDate(user, date, selectedTasks) {
+export async function saveCompletionsForDate(user, date, selectedTasks, occurrenceByTaskId = {}) {
   if (!isEditableDate(date)) {
     throw new Error('INVALID_EDIT_DATE')
   }
@@ -81,7 +81,10 @@ export async function saveCompletionsForDate(user, date, selectedTasks) {
   await Promise.all(
     selectedTasks.map(async (task) => {
       const existingForTask = existing.filter((item) => item.taskId === task.id)
-      const taskCode = getNextTaskCode(existingForTask, task.code)
+      const chosenOccurrence = occurrenceByTaskId[task.id]
+      const taskCode = Number.isInteger(chosenOccurrence)
+        ? getTaskCodeForOccurrence(task.code, chosenOccurrence)
+        : getNextTaskCode(existingForTask, task.code)
 
       await Promise.all(
         existingForTask.map((item) => deleteDoc(doc(db, 'completions', item.id))),

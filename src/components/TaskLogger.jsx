@@ -5,10 +5,14 @@ import { MAX_NOTE_LENGTH, saveNoteForDate, subscribeToNoteForUserDate } from '..
 import { ensureDefaultTasks, formatTaskLabel, subscribeToActiveTasks } from '../lib/tasks'
 import './TaskLogger.css'
 
+const HOURS_TASK_CODE = 'L'
+const HOUR_OPTIONS = Array.from({ length: 12 }, (_, index) => index + 1)
+
 function TaskLogger({ user }) {
   const [tasks, setTasks] = useState([])
   const [selectedDate, setSelectedDate] = useState(getTodayString())
   const [selectedTaskIds, setSelectedTaskIds] = useState(new Set())
+  const [lHours, setLHours] = useState('')
   const [noteText, setNoteText] = useState('')
   const [taskPickerOpen, setTaskPickerOpen] = useState(false)
   const [loadingTasks, setLoadingTasks] = useState(true)
@@ -57,6 +61,7 @@ function TaskLogger({ user }) {
     setError('')
     setMessage('')
     setSelectedTaskIds(new Set())
+    setLHours('')
 
     const unsubscribe = subscribeToNoteForUserDate(
       user.uid,
@@ -93,17 +98,40 @@ function TaskLogger({ user }) {
     }
   }, [taskPickerOpen])
 
-  const toggleTask = (taskId) => {
+  const toggleTask = (task) => {
     setSelectedTaskIds((current) => {
       const next = new Set(current)
-      if (next.has(taskId)) {
-        next.delete(taskId)
+      if (next.has(task.id)) {
+        next.delete(task.id)
+        if (task.code === HOURS_TASK_CODE) {
+          setLHours('')
+        }
       } else {
-        next.add(taskId)
+        next.add(task.id)
+        if (task.code === HOURS_TASK_CODE && !lHours) {
+          setLHours('1')
+        }
       }
       return next
     })
     setMessage('')
+  }
+
+  const handleLHoursChange = (event, task) => {
+    event.stopPropagation()
+    const value = event.target.value
+    setLHours(value)
+    setMessage('')
+
+    setSelectedTaskIds((current) => {
+      const next = new Set(current)
+      if (value) {
+        next.add(task.id)
+      } else {
+        next.delete(task.id)
+      }
+      return next
+    })
   }
 
   const handleDateChange = (event) => {
@@ -125,6 +153,7 @@ function TaskLogger({ user }) {
   const closeTaskPicker = () => {
     setTaskPickerOpen(false)
     setSelectedTaskIds(new Set())
+    setLHours('')
   }
 
   const handleSave = async ({ closeTaskPickerOnSuccess = false } = {}) => {
@@ -145,12 +174,22 @@ function TaskLogger({ user }) {
 
     try {
       const selectedTasks = tasks.filter((task) => selectedTaskIds.has(task.id))
+      const occurrenceByTaskId = {}
+      const hoursTask = selectedTasks.find((task) => task.code === HOURS_TASK_CODE)
+      if (hoursTask) {
+        const hours = Number.parseInt(lHours, 10)
+        occurrenceByTaskId[hoursTask.id] = Number.isInteger(hours)
+          ? Math.min(12, Math.max(1, hours))
+          : 1
+      }
+
       await Promise.all([
-        saveCompletionsForDate(user, selectedDate, selectedTasks),
+        saveCompletionsForDate(user, selectedDate, selectedTasks, occurrenceByTaskId),
         saveNoteForDate(user, selectedDate, noteText),
       ])
       setMessage(`Saved ${displayName}'s entry for ${selectedDate}.`)
       setSelectedTaskIds(new Set())
+      setLHours('')
       if (closeTaskPickerOnSuccess) {
         closeTaskPicker()
       }
@@ -203,6 +242,7 @@ function TaskLogger({ user }) {
           className="task-picker-open-btn"
           onClick={() => {
             setSelectedTaskIds(new Set())
+            setLHours('')
             setTaskPickerOpen(true)
           }}
           disabled={loadingTasks || entryDisabled}
@@ -280,10 +320,27 @@ function TaskLogger({ user }) {
                         <input
                           type="checkbox"
                           checked={selectedTaskIds.has(task.id)}
-                          onChange={() => toggleTask(task.id)}
+                          onChange={() => toggleTask(task)}
                         />
                         <span>{formatTaskLabel(task)}</span>
                       </label>
+                      {task.code === HOURS_TASK_CODE && (
+                        <label className="task-hours-select">
+                          <span>Hours</span>
+                          <select
+                            value={lHours}
+                            onClick={(event) => event.stopPropagation()}
+                            onChange={(event) => handleLHoursChange(event, task)}
+                          >
+                            <option value="">Select hours</option>
+                            {HOUR_OPTIONS.map((hours) => (
+                              <option key={hours} value={String(hours)}>
+                                {hours === 1 ? '1 (L)' : `${hours} (L${hours})`}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      )}
                     </li>
                   ))}
                 </ul>
