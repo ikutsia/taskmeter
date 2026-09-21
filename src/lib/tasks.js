@@ -8,10 +8,12 @@ import {
   query,
   serverTimestamp,
   setDoc,
+  updateDoc,
   where,
 } from 'firebase/firestore'
 import { auth, db } from '../firebase'
 import { DEFAULT_TASKS, TASK_LIST_VERSION } from '../constants/defaultTasks'
+import { updateSeptemberJKCompletionNames } from './completions'
 
 export function formatTaskLabel(task) {
   if (!task?.code) return task?.name || ''
@@ -49,6 +51,19 @@ async function addMissingDefaultTasks(existingCodes) {
   )
 }
 
+async function syncExistingTaskNames(taskDocs) {
+  const namesByCode = new Map(DEFAULT_TASKS.map((task) => [task.code, task.name]))
+
+  await Promise.all(
+    taskDocs.flatMap((item) => {
+      const data = item.data()
+      const nextName = namesByCode.get(data.code)
+      if (!nextName || data.name === nextName) return []
+      return [updateDoc(item.ref, { name: nextName })]
+    }),
+  )
+}
+
 export async function ensureDefaultTasks() {
   const user = auth.currentUser
   if (!user) return
@@ -58,6 +73,8 @@ export async function ensureDefaultTasks() {
   const storedVersion = await getStoredTaskListVersion()
 
   await addMissingDefaultTasks(existingCodes)
+  await syncExistingTaskNames(taskSnapshot.docs)
+  await updateSeptemberJKCompletionNames(user.uid)
 
   if (storedVersion < TASK_LIST_VERSION) {
     await setDoc(

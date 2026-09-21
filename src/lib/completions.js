@@ -177,3 +177,28 @@ export function groupCompletionsByDate(completions) {
 
   return grouped
 }
+
+const SEPTEMBER_SCHOOL_NAMES = {
+  J: 'ნიკოლოს სკოლაში წაყვანა',
+  K: 'ნიკოლოს სკოლიდან გამოყვანა',
+}
+
+export async function updateSeptemberJKCompletionNames(userId) {
+  const snapshot = await getDocs(
+    query(collection(db, 'completions'), where('userId', '==', userId)),
+  )
+
+  const updates = snapshot.docs.flatMap((item) => {
+    const data = item.data()
+    const date = data.date || ''
+    if (date < '2026-09-01' || date > '2026-09-30') return []
+
+    const baseCode = splitTaskCode(data.taskCode).baseCode
+    const nextName = SEPTEMBER_SCHOOL_NAMES[baseCode]
+    if (!nextName || data.taskName === nextName) return []
+
+    return [updateDoc(item.ref, { taskName: nextName })]
+  })
+
+  await Promise.all(updates)
+}
