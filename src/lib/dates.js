@@ -22,19 +22,24 @@ export function getFirstDayOfCurrentMonthString() {
   return toDateString(new Date(today.getFullYear(), today.getMonth(), 1))
 }
 
+export function getFirstDayOfPreviousMonthString() {
+  const today = new Date()
+  return toDateString(new Date(today.getFullYear(), today.getMonth() - 1, 1))
+}
+
 export function isEditableDate(dateString) {
   if (!dateString) return false
-  return dateString >= getFirstDayOfCurrentMonthString() && dateString <= getTodayString()
+  return dateString >= getFirstDayOfPreviousMonthString() && dateString <= getTodayString()
 }
 
 export function clampToEditableDate(dateString) {
   if (!dateString) return getTodayString()
 
   const today = getTodayString()
-  const monthStart = getFirstDayOfCurrentMonthString()
+  const editStart = getFirstDayOfPreviousMonthString()
 
   if (dateString > today) return today
-  if (dateString < monthStart) return monthStart
+  if (dateString < editStart) return editStart
   return dateString
 }
 
