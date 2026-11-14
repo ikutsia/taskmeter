@@ -53,13 +53,20 @@ async function addMissingDefaultTasks(existingCodes) {
 
 async function syncExistingTaskNames(taskDocs) {
   const namesByCode = new Map(DEFAULT_TASKS.map((task) => [task.code, task.name]))
+  const orderByCode = new Map(DEFAULT_TASKS.map((task, index) => [task.code, index]))
 
   await Promise.all(
     taskDocs.flatMap((item) => {
       const data = item.data()
       const nextName = namesByCode.get(data.code)
-      if (!nextName || data.name === nextName) return []
-      return [updateDoc(item.ref, { name: nextName })]
+      const nextOrder = orderByCode.get(data.code)
+      if (nextName == null) return []
+
+      const updates = {}
+      if (data.name !== nextName) updates.name = nextName
+      if (nextOrder != null && data.order !== nextOrder) updates.order = nextOrder
+      if (Object.keys(updates).length === 0) return []
+      return [updateDoc(item.ref, updates)]
     }),
   )
 }
