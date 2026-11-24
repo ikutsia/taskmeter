@@ -2,6 +2,7 @@ import { useState } from 'react'
 import {
   createUserWithEmailAndPassword,
   deleteUser,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   updateProfile,
 } from 'firebase/auth'
@@ -18,7 +19,7 @@ import './LoginPage.css'
 
 const FAMILY_MEMBERS = ['Irakli', 'Nino']
 
-function getAuthErrorMessage(code) {
+function getAuthErrorMessage(code, context = 'signin') {
   switch (code) {
     case 'auth/email-already-in-use':
       return 'This email is already registered. Try signing in instead.'
@@ -28,10 +29,15 @@ function getAuthErrorMessage(code) {
       return 'Password must be at least 6 characters.'
     case 'auth/invalid-credential':
     case 'auth/wrong-password':
-    case 'auth/user-not-found':
       return 'Incorrect email or password.'
+    case 'auth/user-not-found':
+      return context === 'reset'
+        ? 'No account found for this email. Check the address or sign up.'
+        : 'Incorrect email or password.'
     case 'auth/too-many-requests':
       return 'Too many attempts. Please wait a moment and try again.'
+    case 'auth/missing-email':
+      return 'Please enter your email.'
     case 'permission-denied':
       return 'Database access denied. Check your Firestore security rules.'
     default:
@@ -46,13 +52,25 @@ function LoginPage() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState('')
+  const [info, setInfo] = useState('')
   const [loading, setLoading] = useState(false)
 
   const switchMode = (nextMode) => {
     setMode(nextMode)
     setError('')
+    setInfo('')
     setSelectedMember('')
-    setEmail('')
+    setPassword('')
+    setConfirmPassword('')
+    if (nextMode === 'signup' || mode === 'signup') {
+      setEmail('')
+    }
+  }
+
+  const openReset = () => {
+    setMode('reset')
+    setError('')
+    setInfo('')
     setPassword('')
     setConfirmPassword('')
   }
@@ -60,6 +78,7 @@ function LoginPage() {
   const handleSignUp = async (e) => {
     e.preventDefault()
     setError('')
+    setInfo('')
 
     if (!selectedMember) {
       setError('Please select who you are.')
@@ -116,6 +135,7 @@ function LoginPage() {
   const handleSignIn = async (e) => {
     e.preventDefault()
     setError('')
+    setInfo('')
 
     if (!email.trim()) {
       setError('Please enter your email.')
@@ -138,7 +158,30 @@ function LoginPage() {
     }
   }
 
+  const handleReset = async (e) => {
+    e.preventDefault()
+    setError('')
+    setInfo('')
+
+    if (!email.trim()) {
+      setError('Please enter your email.')
+      return
+    }
+
+    setLoading(true)
+
+    try {
+      await sendPasswordResetEmail(auth, email.trim())
+      setInfo('Check your inbox for a reset link. Then come back here to sign in.')
+    } catch (err) {
+      setError(getAuthErrorMessage(err.code, 'reset'))
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const isSignUp = mode === 'signup'
+  const isReset = mode === 'reset'
 
   return (
     <div className="login-page">
@@ -164,16 +207,20 @@ function LoginPage() {
           </button>
         </div>
 
-        <h2 className="login-heading">{isSignUp ? 'Create account' : 'Welcome back'}</h2>
+        <h2 className="login-heading">
+          {isSignUp ? 'Create account' : isReset ? 'Reset password' : 'Welcome back'}
+        </h2>
         <p className="login-subheading">
           {isSignUp
             ? 'Choose your name and set your own email and password.'
-            : 'Sign in with the email and password you created.'}
+            : isReset
+              ? 'Enter the email you signed up with. We will send a reset link.'
+              : 'Sign in with the email and password you created.'}
         </p>
 
         <form
           className="login-form"
-          onSubmit={isSignUp ? handleSignUp : handleSignIn}
+          onSubmit={isSignUp ? handleSignUp : isReset ? handleReset : handleSignIn}
         >
           {isSignUp && (
             <fieldset className="member-select">
@@ -209,16 +256,18 @@ function LoginPage() {
             />
           </label>
 
-          <label className="form-field">
-            <span>Password</span>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder={isSignUp ? 'At least 6 characters' : 'Enter password'}
-              autoComplete={isSignUp ? 'new-password' : 'current-password'}
-            />
-          </label>
+          {!isReset && (
+            <label className="form-field">
+              <span>Password</span>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={isSignUp ? 'At least 6 characters' : 'Enter password'}
+                autoComplete={isSignUp ? 'new-password' : 'current-password'}
+              />
+            </label>
+          )}
 
           {isSignUp && (
             <label className="form-field">
@@ -233,11 +282,34 @@ function LoginPage() {
             </label>
           )}
 
+          {!isSignUp && !isReset && (
+            <button type="button" className="forgot-password-btn" onClick={openReset}>
+              Forgot password?
+            </button>
+          )}
+
           {error && <p className="login-error" role="alert">{error}</p>}
+          {info && <p className="login-info" role="status">{info}</p>}
 
           <button type="submit" className="login-btn" disabled={loading}>
-            {loading ? 'Please wait…' : isSignUp ? 'Create account' : 'Sign in'}
+            {loading
+              ? 'Please wait…'
+              : isSignUp
+                ? 'Create account'
+                : isReset
+                  ? 'Send reset email'
+                  : 'Sign in'}
           </button>
+
+          {isReset && (
+            <button
+              type="button"
+              className="back-to-signin-btn"
+              onClick={() => switchMode('signin')}
+            >
+              Back to sign in
+            </button>
+          )}
         </form>
       </div>
     </div>

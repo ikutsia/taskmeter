@@ -141,6 +141,22 @@
   box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
 }
 
+.forgot-password-btn {
+  align-self: flex-start;
+  margin-top: -0.5rem;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #4f46e5;
+  cursor: pointer;
+}
+
+.forgot-password-btn:hover {
+  text-decoration: underline;
+}
+
 .login-error {
   font-size: 0.875rem;
   color: #dc2626;
@@ -148,6 +164,30 @@
   padding: 0.625rem 0.875rem;
   border-radius: 0.5rem;
   border: 1px solid #fecaca;
+}
+
+.login-info {
+  font-size: 0.875rem;
+  color: #166534;
+  background: #f0fdf4;
+  padding: 0.625rem 0.875rem;
+  border-radius: 0.5rem;
+  border: 1px solid #bbf7d0;
+}
+
+.back-to-signin-btn {
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.back-to-signin-btn:hover {
+  color: #4f46e5;
+  text-decoration: underline;
 }
 
 .login-btn {
