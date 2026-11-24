@@ -5,14 +5,20 @@ import { MAX_NOTE_LENGTH, saveNoteForDate, subscribeToNoteForUserDate } from '..
 import { ensureDefaultTasks, formatTaskLabel, subscribeToActiveTasks } from '../lib/tasks'
 import './TaskLogger.css'
 
-const HOURS_TASK_CODE = 'L'
-const HOUR_OPTIONS = Array.from({ length: 12 }, (_, index) => index + 1)
+const COUNT_TASKS = {
+  L: { max: 12, label: 'Hours' },
+  R: { max: 5, label: 'Count' },
+  S: { max: 5, label: 'Count' },
+  Sh: { max: 12, label: 'Count' },
+}
+
+const EMPTY_COUNTS = { L: '', R: '', S: '', Sh: '' }
 
 function TaskLogger({ user }) {
   const [tasks, setTasks] = useState([])
   const [selectedDate, setSelectedDate] = useState(getTodayString())
   const [selectedTaskIds, setSelectedTaskIds] = useState(new Set())
-  const [lHours, setLHours] = useState('')
+  const [countByCode, setCountByCode] = useState({ ...EMPTY_COUNTS })
   const [noteText, setNoteText] = useState('')
   const [taskPickerOpen, setTaskPickerOpen] = useState(false)
   const [loadingTasks, setLoadingTasks] = useState(true)
@@ -61,7 +67,7 @@ function TaskLogger({ user }) {
     setError('')
     setMessage('')
     setSelectedTaskIds(new Set())
-    setLHours('')
+    setCountByCode({ ...EMPTY_COUNTS })
 
     const unsubscribe = subscribeToNoteForUserDate(
       user.uid,
@@ -103,13 +109,13 @@ function TaskLogger({ user }) {
       const next = new Set(current)
       if (next.has(task.id)) {
         next.delete(task.id)
-        if (task.code === HOURS_TASK_CODE) {
-          setLHours('')
+        if (COUNT_TASKS[task.code]) {
+          setCountByCode((counts) => ({ ...counts, [task.code]: '' }))
         }
       } else {
         next.add(task.id)
-        if (task.code === HOURS_TASK_CODE && !lHours) {
-          setLHours('1')
+        if (COUNT_TASKS[task.code] && !countByCode[task.code]) {
+          setCountByCode((counts) => ({ ...counts, [task.code]: '1' }))
         }
       }
       return next
@@ -117,10 +123,10 @@ function TaskLogger({ user }) {
     setMessage('')
   }
 
-  const handleLHoursChange = (event, task) => {
+  const handleCountChange = (event, task) => {
     event.stopPropagation()
     const value = event.target.value
-    setLHours(value)
+    setCountByCode((counts) => ({ ...counts, [task.code]: value }))
     setMessage('')
 
     setSelectedTaskIds((current) => {
@@ -153,7 +159,7 @@ function TaskLogger({ user }) {
   const closeTaskPicker = () => {
     setTaskPickerOpen(false)
     setSelectedTaskIds(new Set())
-    setLHours('')
+    setCountByCode({ ...EMPTY_COUNTS })
   }
 
   const handleSave = async ({ closeTaskPickerOnSuccess = false } = {}) => {
@@ -175,13 +181,14 @@ function TaskLogger({ user }) {
     try {
       const selectedTasks = tasks.filter((task) => selectedTaskIds.has(task.id))
       const occurrenceByTaskId = {}
-      const hoursTask = selectedTasks.find((task) => task.code === HOURS_TASK_CODE)
-      if (hoursTask) {
-        const hours = Number.parseInt(lHours, 10)
-        occurrenceByTaskId[hoursTask.id] = Number.isInteger(hours)
-          ? Math.min(12, Math.max(1, hours))
+      selectedTasks.forEach((task) => {
+        const config = COUNT_TASKS[task.code]
+        if (!config) return
+        const count = Number.parseInt(countByCode[task.code], 10)
+        occurrenceByTaskId[task.id] = Number.isInteger(count)
+          ? Math.min(config.max, Math.max(1, count))
           : 1
-      }
+      })
 
       await Promise.all([
         saveCompletionsForDate(user, selectedDate, selectedTasks, occurrenceByTaskId),
@@ -189,7 +196,7 @@ function TaskLogger({ user }) {
       ])
       setMessage(`Saved ${displayName}'s entry for ${selectedDate}.`)
       setSelectedTaskIds(new Set())
-      setLHours('')
+      setCountByCode({ ...EMPTY_COUNTS })
       if (closeTaskPickerOnSuccess) {
         closeTaskPicker()
       }
@@ -242,7 +249,7 @@ function TaskLogger({ user }) {
           className="task-picker-open-btn"
           onClick={() => {
             setSelectedTaskIds(new Set())
-            setLHours('')
+            setCountByCode({ ...EMPTY_COUNTS })
             setTaskPickerOpen(true)
           }}
           disabled={loadingTasks || entryDisabled}
@@ -324,18 +331,18 @@ function TaskLogger({ user }) {
                         />
                         <span>{formatTaskLabel(task)}</span>
                       </label>
-                      {task.code === HOURS_TASK_CODE && (
+                      {COUNT_TASKS[task.code] && (
                         <label className="task-hours-select">
-                          <span>Hours</span>
+                          <span>{COUNT_TASKS[task.code].label}</span>
                           <select
-                            value={lHours}
+                            value={countByCode[task.code] || ''}
                             onClick={(event) => event.stopPropagation()}
-                            onChange={(event) => handleLHoursChange(event, task)}
+                            onChange={(event) => handleCountChange(event, task)}
                           >
-                            <option value="">Select hours</option>
-                            {HOUR_OPTIONS.map((hours) => (
-                              <option key={hours} value={String(hours)}>
-                                {hours === 1 ? '1 (L)' : `${hours} (L${hours})`}
+                            <option value="">Select {COUNT_TASKS[task.code].label.toLowerCase()}</option>
+                            {Array.from({ length: COUNT_TASKS[task.code].max }, (_, index) => index + 1).map((count) => (
+                              <option key={count} value={String(count)}>
+                                {count === 1 ? `1 (${task.code})` : `${count} (${task.code}${count})`}
                               </option>
                             ))}
                           </select>

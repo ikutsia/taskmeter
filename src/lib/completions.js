@@ -36,9 +36,24 @@ export function getOccurrenceFromTaskCode(taskCode, baseCode) {
   return 1
 }
 
+export const MAX_OCCURRENCE_BY_CODE = {
+  L: 12,
+  R: 5,
+  S: 5,
+  Sh: 12,
+}
+
+export function clampOccurrence(baseCode, occurrence) {
+  const maxAllowed = MAX_OCCURRENCE_BY_CODE[baseCode]
+  const safeOccurrence = Number.isInteger(occurrence) && occurrence >= 1 ? occurrence : 1
+  if (maxAllowed == null) return safeOccurrence
+  return Math.min(maxAllowed, safeOccurrence)
+}
+
 export function getTaskCodeForOccurrence(baseCode, occurrence) {
-  if (occurrence <= 1) return baseCode
-  return `${baseCode}${occurrence}`
+  const safeOccurrence = clampOccurrence(baseCode, occurrence)
+  if (safeOccurrence <= 1) return baseCode
+  return `${baseCode}${safeOccurrence}`
 }
 
 export function getNextTaskCode(existingForTask, baseCode) {
@@ -83,7 +98,7 @@ export async function saveCompletionsForDate(user, date, selectedTasks, occurren
       const existingForTask = existing.filter((item) => item.taskId === task.id)
       const chosenOccurrence = occurrenceByTaskId[task.id]
       const taskCode = Number.isInteger(chosenOccurrence)
-        ? getTaskCodeForOccurrence(task.code, chosenOccurrence)
+        ? getTaskCodeForOccurrence(task.code, clampOccurrence(task.code, chosenOccurrence))
         : getNextTaskCode(existingForTask, task.code)
 
       await Promise.all(
